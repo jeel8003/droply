@@ -9,14 +9,12 @@ export async function PATCH(
   props: { params: Promise<{ fileId: string }> }
 ) {
   try {
-    // Check authentication
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { fileId } = await props.params;
-
     if (!fileId) {
       return NextResponse.json(
         { error: "File ID is required" },
@@ -34,20 +32,22 @@ export async function PATCH(
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 
-    // Toggle the isStarred status
-    const updatedFiles = await db
+    // Toggle the isTrash status (move to trash or restore)
+    const [updatedFile] = await db
       .update(files)
-      .set({ isStarred: !file.isStarred })
+      .set({ isTrash: !file.isTrash })
       .where(and(eq(files.id, fileId), eq(files.userId, userId)))
       .returning();
 
-    const updatedFile = updatedFiles[0];
-
-    return NextResponse.json(updatedFile);
+    const action = updatedFile.isTrash ? "moved to trash" : "restored";
+    return NextResponse.json({
+      ...updatedFile,
+      message: `File ${action} successfully`,
+    });
   } catch (error) {
-    console.error("Error starring file:", error);
+    console.error("Error updating trash status:", error);
     return NextResponse.json(
-      { error: "Failed to update file" },
+      { error: "Failed to update file trash status" },
       { status: 500 }
     );
   }
